@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Clinic Management</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Google Fonts for a distinct look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Smart Clinic Management</h1>
+
+        <!-- Navigation -->
+        <div id="nav">
+            <button onclick="showSection('login-section')">Login / Register</button>
+        </div>
+
+        <!-- Login / Register Section -->
+        <div id="login-section" class="section visible">
+            <h2>Doctor Login</h2>
+            <input type="email" id="doc-email" placeholder="Email">
+            <input type="password" id="doc-password" placeholder="Password">
+            <button onclick="loginDoctor()">Login as Doctor</button>
+            <button onclick="showRegisterDoctor()">Register as Doctor</button>
+
+            <h2>Patient Login</h2>
+            <input type="email" id="pat-email-login" placeholder="Email">
+            <button onclick="loginPatient()">Login as Patient</button>
+            <button onclick="showRegisterPatient()">Register as Patient</button>
+        </div>
+
+        <!-- Doctor Registration -->
+        <div id="doc-register-section" class="section">
+            <h2>Register Doctor</h2>
+            <input type="text" id="reg-doc-name" placeholder="Name">
+            <input type="text" id="reg-doc-spec" placeholder="Specialization">
+            <input type="email" id="reg-doc-email" placeholder="Email">
+            <input type="password" id="reg-doc-pass" placeholder="Password">
+            <button onclick="registerDoctor()">Register</button>
+            <button onclick="showSection('login-section')">Back</button>
+        </div>
+
+        <!-- Patient Registration -->
+        <div id="pat-register-section" class="section">
+            <h2>Register Patient</h2>
+            <input type="text" id="reg-pat-name" placeholder="Name">
+            <input type="email" id="reg-pat-email" placeholder="Email">
+            <input type="text" id="reg-pat-phone" placeholder="Phone">
+            <button onclick="registerPatient()">Register</button>
+            <button onclick="showSection('login-section')">Back</button>
+        </div>
+
+        <!-- Doctor Dashboard -->
+        <div id="doctor-dashboard" class="section">
+            <h2>Doctor Dashboard</h2>
+            <p>Welcome, Doctor <span id="doc-name-display"></span></p>
+            <h3>Appointments</h3>
+            <button onclick="loadDoctorAppointments()">Refresh Appointments</button>
+            <table id="doc-appointments-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Patient</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+            <button onclick="logout()">Logout</button>
+        </div>
+
+        <!-- Patient Dashboard -->
+        <div id="patient-dashboard" class="section">
+            <h2>Patient Dashboard</h2>
+            <p>Welcome, Patient <span id="pat-name-display"></span></p>
+            <h3>Book Appointment</h3>
+            <select id="doctor-select">
+                <option value="">Select Doctor</option>
+            </select>
+            <input type="datetime-local" id="book-date">
+            <button onclick="bookAppointment()">Book</button>
+
+            <h3>My Appointments</h3>
+            <button onclick="loadPatientAppointments()">Refresh Appointments</button>
+            <table id="pat-appointments-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Doctor</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+            <button onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        const API_URL = 'http://localhost:8081/api';
+
+        function showSection(id) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('visible'));
+            document.getElementById(id).classList.add('visible');
+        }
+
+        function showRegisterDoctor() { showSection('doc-register-section'); }
+        function showRegisterPatient() { showSection('pat-register-section'); }
+
+        async function registerDoctor() {
+            const data = {
+                name: document.getElementById('reg-doc-name').value,
+                specialization: document.getElementById('reg-doc-spec').value,
+                email: document.getElementById('reg-doc-email').value,
+                password: document.getElementById('reg-doc-pass').value
+            };
+            const res = await fetch(`${API_URL}/doctors/register`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+            });
+            if (res.ok) { alert('Registered!'); showSection('login-section'); }
+            else {
+                const errorText = await res.text();
+                alert('Error registering: ' + errorText);
+            }
+        }
+
+        async function registerPatient() {
+            const data = {
+                name: document.getElementById('reg-pat-name').value,
+                email: document.getElementById('reg-pat-email').value,
+                phone: document.getElementById('reg-pat-phone').value
+            };
+            const res = await fetch(`${API_URL}/auth/register/patient`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+            });
+            if (res.ok) { alert('Registered!'); showSection('login-section'); }
+            else {
+                const errorText = await res.text();
+                alert('Error registering: ' + errorText);
+            }
+        }
+
+        async function loginDoctor() {
+            const email = document.getElementById('doc-email').value;
+            const password = document.getElementById('doc-password').value;
+            const res = await fetch(`${API_URL}/auth/login/doctor`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password })
+            });
+            if (res.ok) {
+                currentUser = await res.json();
+                document.getElementById('doc-name-display').innerText = email;
+                showSection('doctor-dashboard');
+                loadDoctorAppointments();
+            } else alert('Invalid login');
+        }
+
+        async function loginPatient() {
+            const email = document.getElementById('pat-email-login').value;
+            const res = await fetch(`${API_URL}/auth/login/patient`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
+            });
+            if (res.ok) {
+                currentUser = await res.json();
+                document.getElementById('pat-name-display').innerText = email;
+                showSection('patient-dashboard');
+                loadDoctors();
+                loadPatientAppointments();
+            } else alert('Invalid login');
+        }
+
+        function logout() {
+            currentUser = null;
+            showSection('login-section');
+        }
+
+        async function loadDoctors() {
+            const res = await fetch(`${API_URL}/doctors`);
+            const doctors = await res.json();
+            const select = document.getElementById('doctor-select');
+            select.innerHTML = '<option value="">Select Doctor</option>';
+            doctors.forEach(d => {
+                select.innerHTML += `<option value="${d.id}">${d.name} (${d.specialization})</option>`;
+            });
+        }
+
+        async function bookAppointment() {
+            const doctorId = document.getElementById('doctor-select').value;
+            const dateTime = document.getElementById('book-date').value;
+            if (!doctorId || !dateTime) return alert('Fill all fields');
+
+            const data = {
+                doctor: { id: doctorId },
+                patient: { id: currentUser.id },
+                dateTime: dateTime
+            };
+            const res = await fetch(`${API_URL}/appointments`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+            });
+            if (res.ok) { alert('Booked!'); loadPatientAppointments(); }
+            else alert('Error booking');
+        }
+
+        async function loadPatientAppointments() {
+            const res = await fetch(`${API_URL}/appointments/patient/${currentUser.id}`);
+            const apps = await res.json();
+            const tbody = document.querySelector('#pat-appointments-table tbody');
+            tbody.innerHTML = '';
+            apps.forEach(a => {
+                tbody.innerHTML += `<tr><td>${a.id}</td><td>${a.doctor.name}</td><td>${a.dateTime}</td><td>${a.status}</td></tr>`;
+            });
+        }
+
+        async function loadDoctorAppointments() {
+            const res = await fetch(`${API_URL}/appointments/doctor/${currentUser.id}`);
+            const apps = await res.json();
+            const tbody = document.querySelector('#doc-appointments-table tbody');
+            tbody.innerHTML = '';
+            apps.forEach(a => {
+                tbody.innerHTML += `<tr>
+                    <td>${a.id}</td>
+                    <td>${a.patient.name}</td>
+                    <td>${a.dateTime}</td>
+                    <td>${a.status}</td>
+                    <td><button onclick="completeAppointment(${a.id})">Complete</button></td>
+                </tr>`;
+            });
+        }
+
+        async function completeAppointment(id) {
+            const res = await fetch(`${API_URL}/appointments/${id}/status?status=COMPLETED`, { method: 'PUT' });
+            if (res.ok) loadDoctorAppointments();
+        }
+
+    </script>
+</body>
+
+</html>
